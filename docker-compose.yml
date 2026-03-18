@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  reverse:
+    build:
+      context: ./nginx
+    container_name: secure-reverse
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  api:
+    build:
+      context: ./api
+    container_name: secure-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: appdb
+      DB_USER: appuser
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      LOG_DIR: /var/log/secure-microservices/api
+    networks:
+      - backend
+    restart: unless-stopped
+    volumes:
+      - app_logs:/var/log/secure-microservices/api
+
+  db:
+    image: postgres:16-alpine
+    container_name: secure-db
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    networks:
+      - backend
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  monitor:
+    build:
+      context: ./monitor
+    container_name: secure-monitor
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      LOG_FILE: /var/log/secure-microservices/api/app.log
+    network_mode: "none"
+    restart: unless-stopped
+    volumes:
+      - app_logs:/var/log/secure-microservices/api:ro
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  db_data:
+  app_logs:

@@ -1,0 +1,118 @@
+version: "3.9"
+
+services:
+  reverse:
+    image: secure-microservices-swarm-reverse:latest
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    networks:
+      - frontend
+      - backend
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      placement:
+        constraints:
+          - node.role == manager
+
+  api:
+    image: secure-microservices-swarm-api:latest
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: appdb
+      DB_USER: appuser
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      LOG_DIR: /var/log/secure-microservices/api
+    secrets:
+      - db_password
+    networks:
+      - backend
+    volumes:
+      - app_logs:/var/log/secure-microservices/api
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    networks:
+      - backend
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints:
+          - node.role == manager
+
+  monitor:
+    image: secure-microservices-swarm-monitor:latest
+    environment:
+      LOG_FILE: /var/log/secure-microservices/api/app.log
+    networks:
+      - backend
+    volumes:
+      - app_logs:/var/log/secure-microservices/api:ro
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+
+networks:
+  frontend:
+    driver: overlay
+    attachable: true
+  backend:
+    driver: overlay
+    internal: true
+    attachable: true
+
+volumes:
+  db_data:
+    driver: local
+  app_logs:
+    driver: local
+
+secrets:
+  db_password:
+    external: true
