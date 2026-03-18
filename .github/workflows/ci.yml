@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation dependencies
+        run: pip install PyYAML
+
+      - name: Validate YAML syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          files = [
+              "docker-compose.yml",
+              "stack.yml",
+              ".github/workflows/ci.yml",
+          ]
+
+          for file_name in files:
+              with Path(file_name).open("r", encoding="utf-8") as handle:
+                  yaml.safe_load(handle)
+              print(f"Validated YAML: {file_name}")
+          PY
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config > /dev/null
+
+      - name: Build API image
+        run: docker build -t secure-microservices-api-ci ./api
+
+      - name: Build NGINX image
+        run: docker build -t secure-microservices-reverse-ci ./nginx
+
+      - name: Build monitor image
+        run: docker build -t secure-microservices-monitor-ci ./monitor
