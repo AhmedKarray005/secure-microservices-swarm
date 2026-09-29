@@ -118,8 +118,9 @@ docker compose -f stack.yml config --quiet
 ```
 
 Local review on 29 September 2026 checked configuration parsing and the Flask
-health endpoint. Docker image builds, PostgreSQL connectivity and Swarm rollout
-remain unverified in that review because the Docker engine was unavailable.
+health endpoint. [GitHub Actions run 5](https://github.com/AhmedKarray005/secure-microservices-swarm/actions/runs/36560220432)
+also passed all three Docker image builds. Live PostgreSQL connectivity and
+Compose/Swarm deployment remain unverified; the local Docker engine was unavailable.
 
 ## Repository map
 
